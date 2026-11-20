@@ -29,6 +29,15 @@ canvas#cv{display:block;position:relative;z-index:1;border-radius:10px;box-shado
 #goals .g{background:#fff6df;border:1px solid #caa470;padding:2px 8px;border-radius:10px}
 #goals .g.done{color:#4e8b35;background:#ecf3ce;text-decoration:line-through}
 #btns{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+#pigbar{display:flex;gap:6px;justify-content:center;margin-bottom:6px}
+#pigbar.hide2{display:none}
+#pigbar .pb{position:relative;width:52px;height:52px;padding:0;border-radius:50%;background:#fff6df;border:3px solid #caa470;box-shadow:none;overflow:hidden}
+#pigbar .pb canvas{width:46px;height:46px;display:block;margin:0 auto}
+#pigbar .pb i{position:absolute;right:3px;top:2px;font-style:normal;font-size:13px}
+#pigbar .pb em{position:absolute;left:0;right:0;bottom:0;font-style:normal;font-size:10px;line-height:13px;background:rgba(80,140,60,.85);color:#fff}
+#pigbar .pb.busy em{background:rgba(160,100,40,.85)}
+#pigbar .pb.busy canvas{opacity:.6}
+#pigbar .pb.on{border-color:#ffc400;background:#fff3a8;transform:scale(1.08)}
 button{font-family:inherit;border:2px solid #8b522a;background:linear-gradient(180deg,#ffdf86,#d9a044);box-shadow:inset 0 2px #fff4b9,0 4px 0 #86501e;color:#5a2f12;border-radius:18px;font-size:15px;font-weight:900;padding:7px 15px;cursor:pointer}
 button:active{transform:translateY(3px);box-shadow:inset 0 1px #fff4b9,0 1px 0 #86501e}
 button.alt{background:linear-gradient(180deg,#ffd0dc,#f08aa6);border-color:#a8466a;box-shadow:inset 0 2px #ffe8ef,0 4px 0 #a8466a;color:#5a1630}
@@ -69,6 +78,7 @@ button.gray{background:linear-gradient(180deg,#f8e8cb,#c8aa7e);border-color:#866
  #bottom{width:270px;border-top:none;border-left:5px ridge #95612b;height:calc(100% - 60px);padding:18px 12px}
  #goals{flex-direction:column;align-items:stretch;font-size:16px;gap:8px}
  #btns{flex-direction:column}
+ #pigbar{flex-wrap:wrap}
  .res span{font-size:19px}
 }
 @media (max-width:480px){
@@ -94,7 +104,7 @@ button.gray{background:linear-gradient(180deg,#f8e8cb,#c8aa7e);border-color:#866
   <div id="timer"><span id="tm">⏱ 0:00</span><span id="starbar"></span></div>
  </div>
  <div id="wrap"><canvas id="cv"></canvas><div id="toast"></div><div id="tip" class="hide"></div></div>
- <div id="bottom"><div id="goals"></div><div id="btns"><button id="bWard" class="alt">👗 衣柜</button><button id="bPause" class="gray">暂停</button><button id="bMenu" class="gray">关卡</button></div></div>
+ <div id="bottom"><div id="goals"></div><div id="pigbar" class="hide2"></div><div id="btns"><button id="bWard" class="alt">👗 衣柜</button><button id="bPause" class="gray">暂停</button><button id="bMenu" class="gray">关卡</button></div></div>
 </div>
 <div id="ov"><div class="box" id="ovbox"></div></div>
 <script>
@@ -951,7 +961,7 @@ const $=id=>document.getElementById(id);
 let toastT;function toast(s){const t=$('toast');t.textContent=s;t.style.opacity=1;clearTimeout(toastT);toastT=setTimeout(()=>t.style.opacity=0,2000);}
 function tip(k,html){if(SAVE.tips[k])return;SAVE.tips[k]=1;save();const t=$('tip');t.innerHTML=`<div style="flex:1">🐷 ${html}</div><button>好哒</button>`;t.classList.remove('hide');if(G)G.paused=true;t.querySelector('button').onclick=()=>{t.classList.add('hide');if(G){G.paused=false;ui();}};}
 const fmt=t=>Math.floor(t/60)+':'+String(Math.floor(t%60)).padStart(2,'0');
-function ui(){
+function ui(){pigBar();
  if(!G)return;
  for(const k of RES)$('r_'+k).textContent=G.res[k];
  const gb=$('guardBox');if(G.L.bl.includes('camp')){gb.classList.remove('hide2');$('r_guard').textContent=G.guards.length;}else gb.classList.add('hide2');
@@ -998,16 +1008,27 @@ function wardrobe(back){
 cv.addEventListener('pointerdown',ev=>{if(!G||G.done||G.paused)return;const rc=cv.getBoundingClientRect();const px=(ev.clientX-rc.left)/cell,py=(ev.clientY-rc.top-OY)/cell;
  // 1 狼
  let best=null,bd=.75;for(const w of G.wolves){if(w.state==='warn'||w.state==='flee')continue;const d=Math.hypot(w.x-px,(w.y-.4)-py);if(d<bd){bd=d;best=w;}}if(best){tapWolf(best);return;}
- // 1.5 选小猪（新章节）
- if(skillOn()){let bw=null,bdd=.5;for(const w of G.workers){if(w.temp)continue;const d=Math.hypot(w.x-px,(w.y-.4)-py);if(d<bdd){bdd=d;bw=w;}}
-  if(bw){if(G.sel===bw){G.sel=null;toast('取消选中');}else{G.sel=bw;const k=SKILL[bw.outfit];toast(`${k.e} 选中了${OUTFITS[bw.outfit].n}小猪：${k.n}，再点要干的活`);}sfx('tap');return;}}
  // 2 道具
  for(const b of G.bon){if(Math.hypot(b.c+.5-px,b.r+.45-py)<.65){takeBonus(b);return;}}
  const c=Math.floor(px),r=Math.floor(py);if(c<0||r<0||c>=COLS||r>=ROWS)return;
  // 3 宝贝
  const tr=G.treas.find(q=>!q.found&&q.c===c&&q.r===r);if(tr){tr.found=true;G.found++;const k=['gold','gold','food','wood','stone'][Math.floor(Math.random()*5)];const n=k==='gold'?2:3;G.res[k]+=n;fx(c,r,`找到宝贝！${RES_N[k]}+${n}`,'#c0506a');addVfx('buried_treasure',c+.5,r+.55,1.2,.8,.1);addVfx('coin_burst',c+.5,r+.4,.7,.9,.3);sfx('coin');ui();return;}
- if(!G.objs[key(c,r)]&&!bldAt(c,r)){const fy=py-r;if(fy<.45&&r>0&&(G.objs[key(c,r-1)]||bldAt(c,r-1))){tapCell(c,r-1);return;}if(fy>.75&&r<ROWS-1&&(G.objs[key(c,r+1)]||bldAt(c,r+1))){tapCell(c,r+1);return;}}
+ // 4 手指粗：在周围一圈里找离手指最近的能点的东西（房子、建筑、障碍、货郎）
+ let tc=null,td=.85;for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){const cc=c+dc,rr=r+dr;if(cc<0||rr<0||cc>=COLS||rr>=ROWS||!tappable(cc,rr))continue;
+  const d=Math.hypot(cc+.5-px,rr+.4-py)*(dc||dr?1:.7);if(d<td){td=d;tc=[cc,rr];}}
+ if(tc){tapCell(tc[0],tc[1]);return;}
+ // 5 空地上才点小猪（选小猪也可以用下面的小猪按钮）
+ if(skillOn()){let bw=null,bdd=.55;for(const w of G.workers){if(w.temp)continue;const d=Math.hypot(w.x-px,(w.y-.4)-py);if(d<bdd){bdd=d;bw=w;}}if(bw){selPig(bw);return;}}
  tapCell(c,r);});
+function tappable(c,r){return !!(G.objs[key(c,r)]||bldAt(c,r)||(c===G.home[0]&&r===G.home[1])||(G.vSpot&&G.trader&&c===G.vSpot.c&&r===G.vSpot.r));}
+function selPig(bw){if(G.sel===bw){G.sel=null;toast('取消选中');}else{G.sel=bw;const k=SKILL[bw.outfit];toast(`${k.e} 选中了${OUTFITS[bw.outfit].n}小猪：${k.n}，再点要干的活`);}sfx('tap');ui();}
+let PB_SIG='';
+function pigBar(){const el=$('pigbar');if(!el)return;if(!G||!skillOn()){if(PB_SIG!==''){el.innerHTML='';el.classList.add('hide2');PB_SIG='';}return;}
+ const ws=G.workers.filter(w=>!w.temp),sig=G.li+':'+ws.map(w=>w.outfit).join(',');
+ if(sig!==PB_SIG){PB_SIG=sig;el.classList.remove('hide2');el.innerHTML='';ws.forEach((w,i)=>{const b=document.createElement('button');b.className='pb';const cv2=document.createElement('canvas');cv2.width=84;cv2.height=84;const old=x;x=cv2.getContext('2d');pig(42,96,78,1,w.outfit,{});x=old;
+   b.appendChild(cv2);const e=document.createElement('i');e.textContent=SKILL[w.outfit].e;b.appendChild(e);const st=document.createElement('em');b.appendChild(st);
+   b.addEventListener('click',ev=>{ev.preventDefault();if(!G||G.done||G.paused)return;selPig(G.workers.filter(q=>!q.temp)[i]);});el.appendChild(b);});}
+ [...el.children].forEach((b,i)=>{const w=ws[i];if(!w)return;b.classList.toggle('on',G.sel===w);const busy=!(w.state==='idle'||w.state==='home');b.classList.toggle('busy',busy);b.lastChild.textContent=busy?'忙':'闲';});}
 $('bWard').onclick=()=>wardrobe(()=>{});
 $('bPause').onclick=()=>{if(!G||G.done)return;if(!$('ov').classList.contains('hide'))return;G.paused=!G.paused;ui();};
 $('bMenu').onclick=levels;
@@ -1018,7 +1039,7 @@ let AC=null;function sfx(k){try{if(!AC)AC=new (window.AudioContext||window.webki
  const S={hit:[220,140,.07],tap:[520,660,.08],done:[660,880,.15],coin:[880,1320,.12],chime:[1040,1560,.25],bad:[300,180,.3],howl:[380,560,.6],win:[660,1320,.5]}[k]||[500,500,.1];
  o.type=k==='howl'||k==='bad'?'sawtooth':'sine';o.frequency.setValueAtTime(S[0],n);o.frequency.linearRampToValueAtTime(S[1],n+S[2]*.8);g.gain.setValueAtTime(k==='howl'?.05:k==='hit'?.04:.08,n);g.gain.exponentialRampToValueAtTime(.001,n+S[2]);o.start(n);o.stop(n+S[2]+.02);}catch(e){}}
 let last=performance.now();
-function loop(now){const dt=Math.min(0.05,(now-last)/1000);last=now;update(dt);draw();requestAnimationFrame(loop);}
+let PBT=0;function loop(now){const dt=Math.min(0.05,(now-last)/1000);last=now;update(dt);draw();if((PBT+=dt)>.25){PBT=0;pigBar();}requestAnimationFrame(loop);}
 window.addEventListener('resize',resize);try{new ResizeObserver(resize).observe($('wrap'));}catch(e){}
 $('wrap').style.backgroundImage=`url(${ART.bg})`;
 
